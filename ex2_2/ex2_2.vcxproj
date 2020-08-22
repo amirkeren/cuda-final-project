@@ -78,23 +78,19 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="kernel.cu" />
+    <CudaCompile Include="kernels.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="cpu_matrix_multiplier.h" />
-    <ClInclude Include="kernel.h" />
-    <ClInclude Include="matrix_converter.h" />
-    <ClInclude Include="matrix_market_reader.h" />
-    <ClInclude Include="measurement_class.h" />
-    <ClInclude Include="resizable_memory.h" />
+    <ClInclude Include="kernels.h" />
+    <ClInclude Include="matrices.h" />
+    <ClInclude Include="matrix_reader.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cpu_matrix_multiplier.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="matrix_converter.cpp" />
-    <ClCompile Include="matrix_market_reader.cpp" />
-    <ClCompile Include="measurement_class.cpp" />
-    <ClCompile Include="resizable_memory.cpp" />
+    <ClCompile Include="matrices.cpp" />
+    <ClCompile Include="matrix_reader.cpp" />
+    <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

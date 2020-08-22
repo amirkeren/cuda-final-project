@@ -1,4 +1,4 @@
-#include "matrix_converter.h"
+#include "matrices.h"
 
 #include <vector>
 #include <algorithm>
@@ -8,16 +8,16 @@
 #include <chrono>
 #include <cmath>
 
-template <typename data_type>
-csr_matrix_class<data_type>::csr_matrix_class (const matrix_market::matrix_class &matrix, bool row_ptr_only)
-  : meta (matrix.meta)
+csr_matrix_class::csr_matrix_class(const matrix_reader::matrix_class& matrix, bool row_ptr_only): meta(matrix.meta)
 {
-  if (meta.matrix_storage_scheme != matrix_market::matrix_class::storage_scheme::general)
-    throw std::runtime_error ("Only general matrices are supported");
+  if (meta.matrix_storage_scheme != matrix_reader::matrix_class::storage_scheme::general)
+  {
+	throw std::runtime_error("Only general matrices are supported");
+  }
 
   if (!row_ptr_only)
   {
-    data.reset (new data_type [meta.non_zero_count]);
+    data.reset (new float[meta.non_zero_count]);
     columns.reset (new unsigned int[meta.non_zero_count]);
   }
 
@@ -29,7 +29,9 @@ csr_matrix_class<data_type>::csr_matrix_class (const matrix_market::matrix_class
   auto src_data = matrix.get_dbl_data ();
 
   for (unsigned int i = 0; i < meta.non_zero_count; i++)
-    row_ptr[src_rows[i]]++;
+  {
+	  row_ptr[src_rows[i]]++;
+  }
 
   unsigned int ptr = 0;
   for (unsigned int row = 0; row < meta.rows_count + 1; row++)
@@ -41,7 +43,7 @@ csr_matrix_class<data_type>::csr_matrix_class (const matrix_market::matrix_class
 
   if (!row_ptr_only)
   {
-    std::unique_ptr<unsigned int[]> row_element_id (new unsigned int[meta.rows_count]);
+    std::unique_ptr<unsigned int[]> row_element_id(new unsigned int[meta.rows_count]);
     std::fill_n (row_element_id.get (), meta.rows_count, 0u);
 
     for (unsigned int i = 0; i < meta.non_zero_count; i++)
@@ -54,7 +56,7 @@ csr_matrix_class<data_type>::csr_matrix_class (const matrix_market::matrix_class
 
     std::vector<unsigned int> permutation;
     std::vector<unsigned int> tmp_columns;
-    std::vector<data_type> tmp_data;
+    std::vector<float> tmp_data;
     for (unsigned int i = 0; i < meta.rows_count; i++)
     {
       const auto row_begin = row_ptr[i];
@@ -82,29 +84,30 @@ csr_matrix_class<data_type>::csr_matrix_class (const matrix_market::matrix_class
   }
 }
 
-template <typename data_type>
-size_t csr_matrix_class<data_type>::get_matrix_size () const
+size_t csr_matrix_class::get_matrix_size() const
 {
   return meta.non_zero_count;
 }
 
-matrix_rows_statistic get_rows_statistics (
-    const matrix_market::matrix_class::matrix_meta &meta,
-    const unsigned int *row_ptr)
+matrix_rows_statistic get_rows_statistics(const matrix_reader::matrix_class::matrix_meta& meta, const unsigned int* row_ptr)
 {
   matrix_rows_statistic statistic {};
-  statistic.min_elements_in_rows = std::numeric_limits<unsigned int>::max () - 1;
+  statistic.min_elements_in_rows = std::numeric_limits<unsigned int>::max() - 1;
 
   unsigned int sum_elements_in_rows = 0;
   for (unsigned int row = 0; row < meta.rows_count; row++)
   {
     const auto elements_in_row = row_ptr[row + 1] - row_ptr[row];
 
-    if (elements_in_row > statistic.max_elements_in_rows)
-      statistic.max_elements_in_rows = elements_in_row;
+	if (elements_in_row > statistic.max_elements_in_rows)
+	{
+		statistic.max_elements_in_rows = elements_in_row;
+	}
 
-    if (elements_in_row < statistic.min_elements_in_rows)
-      statistic.min_elements_in_rows = elements_in_row;
+	if (elements_in_row < statistic.min_elements_in_rows)
+	{
+		statistic.min_elements_in_rows = elements_in_row;
+	}
 
     sum_elements_in_rows += elements_in_row;
   }
@@ -122,8 +125,7 @@ matrix_rows_statistic get_rows_statistics (
   return statistic;
 }
 
-template <typename data_type>
-size_t ell_matrix_class<data_type>::estimate_size (csr_matrix_class<data_type> &matrix)
+size_t ell_matrix_class::estimate_size(csr_matrix_class& matrix)
 {
   const auto row_ptr = matrix.row_ptr.get ();
   matrix_rows_statistic row_statistics = get_rows_statistics (matrix.meta, row_ptr);
@@ -132,29 +134,25 @@ size_t ell_matrix_class<data_type>::estimate_size (csr_matrix_class<data_type> &
   return elements_in_rows * matrix.meta.rows_count;
 }
 
-template <typename data_type>
-ell_matrix_class<data_type>::ell_matrix_class (csr_matrix_class<data_type> &matrix)
-  : meta (matrix.meta)
+ell_matrix_class::ell_matrix_class (csr_matrix_class &matrix): meta(matrix.meta)
 {
-  if (meta.matrix_storage_scheme != matrix_market::matrix_class::storage_scheme::general)
-    throw std::runtime_error ("Only general matrices are supported");
+  if (meta.matrix_storage_scheme != matrix_reader::matrix_class::storage_scheme::general)
+  {
+	  throw std::runtime_error("Only general matrices are supported");
+  }
 
-  const auto row_ptr = matrix.row_ptr.get ();
-  const auto col_ptr = matrix.columns.get ();
+  const auto row_ptr = matrix.row_ptr.get();
+  const auto col_ptr = matrix.columns.get();
 
   matrix_rows_statistic row_statistics = get_rows_statistics(meta, row_ptr);
   elements_in_rows = row_statistics.max_elements_in_rows;
 
-  std::cout << "ELL: " << elements_in_rows
-            << " elements in rows (min: " << row_statistics.min_elements_in_rows
-            << "; avg: " << row_statistics .avg_elements_in_rows << ")" << std::endl;
-
   const size_t elements_count = elements_in_rows * meta.rows_count;
-  data.reset (new data_type[elements_count]);
+  data.reset (new float[elements_count]);
   columns.reset (new unsigned int[elements_count]);
 
-  std::fill_n (data.get (), elements_count, 0);
-  std::fill_n (columns.get (), elements_count, 0);
+  std::fill_n (data.get(), elements_count, 0);
+  std::fill_n (columns.get(), elements_count, 0);
 
   for (unsigned int row = 0; row < meta.rows_count; row++)
   {
@@ -169,16 +167,13 @@ ell_matrix_class<data_type>::ell_matrix_class (csr_matrix_class<data_type> &matr
   }
 }
 
-template <typename data_type>
-ell_matrix_class<data_type>::ell_matrix_class (csr_matrix_class<data_type> &matrix, unsigned int elements_in_row_arg)
-  : meta (matrix.meta)
-  , elements_in_rows (elements_in_row_arg)
+ell_matrix_class::ell_matrix_class(csr_matrix_class& matrix, unsigned int elements_in_row_arg): meta(matrix.meta), elements_in_rows(elements_in_row_arg)
 {
   const auto row_ptr = matrix.row_ptr.get ();
   const auto col_ptr = matrix.columns.get ();
 
-  const unsigned int elements_count = get_matrix_size ();
-  data.reset (new data_type[elements_count]);
+  const unsigned int elements_count = get_matrix_size();
+  data.reset (new float[elements_count]);
   columns.reset (new unsigned int[elements_count]);
 
   std::fill_n (data.get (), elements_count, 0);
@@ -198,26 +193,24 @@ ell_matrix_class<data_type>::ell_matrix_class (csr_matrix_class<data_type> &matr
   }
 }
 
-template <typename data_type>
-size_t ell_matrix_class<data_type>::get_matrix_size () const
+size_t ell_matrix_class::get_matrix_size() const
 {
   return meta.rows_count * elements_in_rows;
 }
 
-template <typename data_type>
-coo_matrix_class<data_type>::coo_matrix_class(csr_matrix_class<data_type> &matrix)
-  : meta (matrix.meta)
-  , elements_count (meta.non_zero_count)
+coo_matrix_class::coo_matrix_class(csr_matrix_class& matrix): meta(matrix.meta), elements_count(meta.non_zero_count)
 {
-  if (meta.matrix_storage_scheme != matrix_market::matrix_class::storage_scheme::general)
-    throw std::runtime_error ("Only general matrices are supported");
+  if (meta.matrix_storage_scheme != matrix_reader::matrix_class::storage_scheme::general)
+  {
+	  throw std::runtime_error("Only general matrices are supported");
+  }
 
-  data.reset (new data_type[meta.non_zero_count]);
+  data.reset (new float[meta.non_zero_count]);
   cols.reset (new unsigned int[meta.non_zero_count]);
   rows.reset (new unsigned int[meta.non_zero_count]);
 
-  const auto row_ptr = matrix.row_ptr.get ();
-  const auto col_ptr = matrix.columns.get ();
+  const auto row_ptr = matrix.row_ptr.get();
+  const auto col_ptr = matrix.columns.get();
 
   unsigned int id = 0;
   for (unsigned int row = 0; row < meta.rows_count; row++)
@@ -235,12 +228,10 @@ coo_matrix_class<data_type>::coo_matrix_class(csr_matrix_class<data_type> &matri
   }
 }
 
-template <typename data_type>
-coo_matrix_class<data_type>::coo_matrix_class (csr_matrix_class<data_type> &matrix, unsigned int element_start)
-  : meta (matrix.meta)
+coo_matrix_class::coo_matrix_class (csr_matrix_class& matrix, unsigned int element_start): meta(matrix.meta)
 {
-  const auto row_ptr = matrix.row_ptr.get ();
-  const auto col_ptr = matrix.columns.get ();
+  const auto row_ptr = matrix.row_ptr.get();
+  const auto col_ptr = matrix.columns.get();
 
   for (unsigned int row = 0; row < meta.rows_count; row++)
   {
@@ -248,13 +239,15 @@ coo_matrix_class<data_type>::coo_matrix_class (csr_matrix_class<data_type> &matr
     const auto end = row_ptr[row + 1];
 
     for (auto element = start; element < end; element++)
-      if (element - start >= element_start)
-      elements_count++;
+	   if (element - start >= element_start)
+	   {
+	       elements_count++;
+	   }
   }
 
-  data.reset (new data_type[get_matrix_size ()]);
-  cols.reset (new unsigned int[get_matrix_size ()]);
-  rows.reset (new unsigned int[get_matrix_size ()]);
+  data.reset (new float[get_matrix_size()]);
+  cols.reset (new unsigned int[get_matrix_size()]);
+  rows.reset (new unsigned int[get_matrix_size()]);
 
   unsigned int id = 0;
   for (unsigned int row = 0; row < meta.rows_count; row++)
@@ -275,17 +268,7 @@ coo_matrix_class<data_type>::coo_matrix_class (csr_matrix_class<data_type> &matr
   }
 }
 
-template <typename data_type>
-size_t coo_matrix_class<data_type>::get_matrix_size () const
+size_t coo_matrix_class::get_matrix_size() const
 {
   return elements_count;
 }
-
-template class csr_matrix_class<float>;
-template class csr_matrix_class<double>;
-
-template class ell_matrix_class<float>;
-template class ell_matrix_class<double>;
-
-template class coo_matrix_class<float>;
-template class coo_matrix_class<double>;
